@@ -1,9 +1,9 @@
 from typing import Annotated, TypedDict, List
 import os
 import textwrap
-import operator
 from langchain_groq import ChatGroq
-from langchain_core.messages import SystemMessage, HumanMessage, AnyMessage, trim_messages
+from groq import RateLimitError
+from langchain_core.messages import SystemMessage, HumanMessage, AnyMessage, trim_messages, AIMessage, ToolMessage
 from langchain_core.messages.utils import count_tokens_approximately
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
@@ -11,6 +11,7 @@ from langgraph.prebuilt import ToolNode
 from langgraph.checkpoint.memory import InMemorySaver
 import streamlit as st
 from dotenv import load_dotenv
+import re
 from utils.tools import search_concepts, search_implementations
 
 load_dotenv()
@@ -21,6 +22,7 @@ st.markdown("""
     # 🐧 GNU Coreutils AI Navigator
     
     **Your expert co-pilot for exploring the source code of standard Linux utilities (`ls`, `cp`, `mv`, etc.).**
+    
     
     ### 🚀 Key Features
     * **🔍 Conceptual Search:** Can answer detailed answer about library functions.
@@ -46,7 +48,9 @@ if "thread_id" not in st.session_state:
 class AgentState(TypedDict):
     # 'add_messages' ensures new messages are appended to history
     messages: Annotated[List[AnyMessage], add_messages]
-    loop_step: Annotated[int, operator.add]
+    loop_step: int
+    terminate: bool
+    terminate_message: str
 
 # ==============================================================================
 # INITIALIZE MODEL & NODES
@@ -58,15 +62,40 @@ def navigation_router(state: AgentState):
     If the last message contains tool_calls, we go to the tools node.
     Otherwise, we end the workflow.
     """
-    current_step = state.get("loop_step", 0)
-    if current_step >= 10:
+    print("Inside Navigation Router")
+    if state.get("terminate", False):
         return END
+
+    current_step = state.get("loop_step", 0)
+    print("Current Step:", current_step)
+    if current_step >= 5:
+        return "finalizer"
     
     last_message = state["messages"][-1]
     if last_message.tool_calls:
+        print("Routing to tools...")
         return "tools"
-    else:
-        return END
+    
+    print("Routing to end...")
+    return END
+
+def sanitize(messages):
+    """
+    Docstring for sanitize
+    
+    :param messages: List[AnyMessage]
+    :return: List[AnyMessage]
+    """
+    cleaned = []
+    for m in messages:
+        if isinstance(m, ToolMessage):
+            continue
+        if isinstance(m, AIMessage):
+            cleaned.append(AIMessage(content=m.content))
+        else:
+            cleaned.append(m)
+    return cleaned
+
 
 # ==============================================================================
 # BUILD THE GRAPH
@@ -84,24 +113,28 @@ def initialize_graph():
     # Initialize LLM and bind tools
     llm = ChatGroq(model="openai/gpt-oss-20b", temperature=0.3)
     llm_with_tools = llm.bind_tools(tools)
+    final_llm = llm.bind_tools([], tool_choice="none")
+
 
     def agent_node(state: AgentState):
         """
         The main reasoning node.
         It receives the history and decides whether to answer or call a tool.
         """
+        print("Inside Agent Node")
 
         system_msg = textwrap.dedent("""
-            You are an expert C/C++ Engineer analyzing the GNU Coreutils library.
-            Your task is to assist with questions about GNU Coreutils asked by the user.
-            To understand high-level behavior or 'Why', use 'search_concepts'.
-            To see C code, structs, or functions, use 'search_implementations'.
-            RULES FOR EFFICIENCY:
-            1. **DO NOT** output internal monologue, plans, or 'I will now...' statements.
-            2. If you need information, generate the Tool Call **immediately**.
-            3. If you have enough information, output the final answer **immediately**.
-            4. Do not double-check your work. Be decisive.
-            5. Keep your responses concise and to the point and make sure the response is human understandable.
+            You are an expert C/C++ technical assistant analyzing the GNU Coreutils library **ONLY**.
+            To understand high-level behavior, search for documentation and developer comments, use 'search_concepts'.
+            To search for C code, structs, enums or function use 'search_implementations'.
+            If the user asks about ANY topic unrelated to Coreutils, C programming, or Linux system calls, you must:
+            1. REFUSE to answer.
+            2. State clearly: 'I can only assist with GNU Coreutils and related system programming topics.'
+            3. DO NOT try to be helpful or provide a 'brief' answer to the off-topic query.
+            If you are **UNSURE** or **UNABLE TO ANSWER**, output the final answer **immediately** or specify 'I cannot help you with this query'.
+            The user may ask wrong or misleading questions. Always provide the correct information.
+            Do not double-check your work. Be decisive.
+            Keep your responses concise and to the point and make sure the response is human understandable.
             Always cite the file name when explaining logic.
         """).strip()
 
@@ -119,8 +152,58 @@ def initialize_graph():
         # (Note: We don't add it to state['messages'] to avoid duplicating it in history)
         messages = [system_msg] + trimmed_messages
 
-        response = llm_with_tools.invoke(messages)
-        return {"messages": [response], "loop_step": 1}
+        try:
+            response = llm_with_tools.invoke(messages)
+            current_step = -1
+            if response.tool_calls:
+                current_step = state.get("loop_step", 0)
+            return {"messages": [response], "loop_step": current_step + 1, "terminate": False, "terminate_message": ""}
+        except Exception as e:
+            error_message = e.message
+            match = re.search(r"Please try again in (.*?)\.", error_message)
+            message = ""
+            if match:
+                wait_time = match.group(1)
+                message = f"⚠️ System is currently busy. Please wait {wait_time} before trying again."
+            else:
+                message = "⚠️ Rate limit reached. Please try again in a few minutes."
+            return {"messages": [], "loop_step": 0, "terminate": True, "terminate_message": message}
+        
+
+    def finalizer_node(state: AgentState):
+        """
+        Forces the agent to generate a final answer using currently available info.
+        """
+
+        print("Inside Finalizer Node")
+
+        # Sanitize messages to remove tool call metadata
+        sanitized_messages = sanitize(state["messages"])
+
+        # Create a system message that effectively says "Time's up!"
+        force_msg = SystemMessage(content=(
+            "SYSTEM NOTICE: You have reached the maximum number of reasoning steps. "
+            "Stop using tools immediately. "
+            "Summarize the information you have gathered so far to answer the user's question. "
+            "If you don't have the full answer, explain what you found and what is missing."
+        ))
+        
+        # We invoke the LLM one last time with this extra instruction
+        messages = sanitized_messages + [force_msg]
+
+        try:
+            response = final_llm.invoke(messages)
+            return {"messages": [response], "loop_step": 0, "terminate": False, "terminate_message": ""}
+        except Exception as e:
+            error_message = e.message
+            match = re.search(r"Please try again in (.*?)\.", error_message)
+            message = ""
+            if match:
+                wait_time = match.group(1)
+                message = f"⚠️ System is currently busy. Please wait {wait_time} before trying again."
+            else:
+                message = "⚠️ Rate limit reached. Please try again in a few minutes."
+            return {"messages": [], "loop_step": 0, "terminate": True, "terminate_message": message}
 
     # The Prebuilt ToolNode handles execution of the Python functions above
     tool_node = ToolNode(tools,)
@@ -131,10 +214,10 @@ def initialize_graph():
     # Add Nodes
     workflow.add_node("agent", agent_node)
     workflow.add_node("tools", tool_node)
+    workflow.add_node("finalizer", finalizer_node)
 
     # Set Entry Point
     workflow.add_edge(START, "agent")
-    workflow.add_edge("agent", END)
 
     # Add Conditional Edge (The ReAct Router)
     workflow.add_conditional_edges(
@@ -142,19 +225,19 @@ def initialize_graph():
         navigation_router,      # The function that decides what's next
         {                       # The Map: {Router Output : Graph Node Name}
             "tools": "tools",
+            "finalizer": "finalizer",
             END: END
         }
     )
 
     # Add Edge from Tools back to Agent (The Loop)
     workflow.add_edge("tools", "agent")
+    workflow.add_edge("finalizer", END)
 
     # Compile
     return workflow.compile(checkpointer=memory)
 
-
 app = initialize_graph()
-
 
 # Display existing chat history
 for msg in st.session_state.messages:
@@ -182,6 +265,9 @@ if prompt := st.chat_input("How can I assist you?..."):
             for event in app.stream({"messages": [input_message]}, config=config):
                 # CASE A: The Agent Just Spoke (Thinking or Tool Call)
                 if "agent" in event:
+                    if event["agent"].get("terminate", False):
+                        final_response = event["agent"].get("terminate_message", "⚠️ The agent has terminated the conversation.")
+                        break
                     msg = event["agent"]["messages"][0]
                     if msg.tool_calls:
                         tool_name = msg.tool_calls[0]['name']
@@ -199,6 +285,16 @@ if prompt := st.chat_input("How can I assist you?..."):
                     # preview = msg.content[:200] + "..." if len(msg.content) > 200 else msg.content
                     # st.markdown(f"📄 **Tool Output:** {preview}")
                     status.update(label="Processing tool output...", state="running")
+
+                # CASE C: The Finalizer Just Finished
+                elif "finalizer" in event:
+                    if event["finalizer"].get("terminate", False):
+                        final_response = event["finalizer"].get("terminate_message", "⚠️ The agent has terminated the conversation.")
+                        break
+                    msg = event["finalizer"]["messages"][0]
+                    final_response = msg.content
+                    # set loop_step to zero
+
             
             # 3. Final Polish
             status.update(label="Your response is ready!", state="complete", expanded=True)
