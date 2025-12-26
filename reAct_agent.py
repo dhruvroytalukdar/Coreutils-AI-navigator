@@ -1,8 +1,8 @@
 from typing import Annotated, TypedDict, List
 import os
 import textwrap
+import re
 from langchain_groq import ChatGroq
-from groq import RateLimitError
 from langchain_core.messages import SystemMessage, HumanMessage, AnyMessage, trim_messages, AIMessage, ToolMessage
 from langchain_core.messages.utils import count_tokens_approximately
 from langgraph.graph import StateGraph, START, END
@@ -11,7 +11,6 @@ from langgraph.prebuilt import ToolNode
 from langgraph.checkpoint.memory import InMemorySaver
 import streamlit as st
 from dotenv import load_dotenv
-import re
 from utils.tools import search_concepts, search_implementations
 
 load_dotenv()
@@ -46,7 +45,6 @@ if "thread_id" not in st.session_state:
 # ==============================================================================
 
 class AgentState(TypedDict):
-    # 'add_messages' ensures new messages are appended to history
     messages: Annotated[List[AnyMessage], add_messages]
     loop_step: int
     terminate: bool
@@ -148,8 +146,6 @@ def initialize_graph():
                                         start_on="human",
                                         end_on=("human", "tool"),)
 
-        # We prepend the system message to the history for the model call
-        # (Note: We don't add it to state['messages'] to avoid duplicating it in history)
         messages = [system_msg] + trimmed_messages
 
         try:
@@ -188,7 +184,6 @@ def initialize_graph():
             "If you don't have the full answer, explain what you found and what is missing."
         ))
         
-        # We invoke the LLM one last time with this extra instruction
         messages = sanitized_messages + [force_msg]
 
         try:
@@ -205,7 +200,6 @@ def initialize_graph():
                 message = "⚠️ Rate limit reached. Please try again in a few minutes."
             return {"messages": [], "loop_step": 0, "terminate": True, "terminate_message": message}
 
-    # The Prebuilt ToolNode handles execution of the Python functions above
     tool_node = ToolNode(tools,)
 
     memory = InMemorySaver()
@@ -221,9 +215,9 @@ def initialize_graph():
 
     # Add Conditional Edge (The ReAct Router)
     workflow.add_conditional_edges(
-        "agent",                # The node that just finished
-        navigation_router,      # The function that decides what's next
-        {                       # The Map: {Router Output : Graph Node Name}
+        "agent",                
+        navigation_router,      
+        {                       
             "tools": "tools",
             "finalizer": "finalizer",
             END: END
@@ -235,9 +229,12 @@ def initialize_graph():
     workflow.add_edge("finalizer", END)
 
     # Compile
-    return workflow.compile(checkpointer=memory)
+    temp =  workflow.compile(checkpointer=memory)
+    print(temp.get_graph().draw_mermaid())
+    return temp
 
 app = initialize_graph()
+
 
 # Display existing chat history
 for msg in st.session_state.messages:
@@ -272,7 +269,6 @@ if prompt := st.chat_input("How can I assist you?..."):
                     if msg.tool_calls:
                         tool_name = msg.tool_calls[0]['name']
                         tool_args = msg.tool_calls[0]['args']
-                        # st.markdown(f"🛠️ **Decided to call:** `{tool_name}`")
                         status.update(label=f"Executing {tool_name}...", state="running")
                     else:
                         # If no tool call, this is the final answer
@@ -281,9 +277,6 @@ if prompt := st.chat_input("How can I assist you?..."):
                 # CASE B: The Tool Just Finished
                 elif "tools" in event:
                     msg = event["tools"]["messages"][0]
-                    # We truncate tool output in the UI because it can be huge (long C files)
-                    # preview = msg.content[:200] + "..." if len(msg.content) > 200 else msg.content
-                    # st.markdown(f"📄 **Tool Output:** {preview}")
                     status.update(label="Processing tool output...", state="running")
 
                 # CASE C: The Finalizer Just Finished
@@ -293,7 +286,6 @@ if prompt := st.chat_input("How can I assist you?..."):
                         break
                     msg = event["finalizer"]["messages"][0]
                     final_response = msg.content
-                    # set loop_step to zero
 
             
             # 3. Final Polish
