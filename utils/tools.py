@@ -8,7 +8,7 @@ def load_vector_stores():
     """Load and return all vector stores."""
 
     f_stores = get_vector_store(
-        index_name="vector_db_index/coreutils_index_functions",
+        index_name="vector_db_index/coreutils_index_functions_structs_enums",
         load_from_disk=True
     )
 

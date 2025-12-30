@@ -2,7 +2,7 @@ from tree_sitter import Language, Parser, Query, QueryCursor
 import tree_sitter_c as tsc
 from utils.models import Captured_Struct, Captured_Enum, Captured_Function, Captured_Comment
 from utils.query_schema import query_schema
-from utils.vector_store import get_vector_store, get_top_comments, get_top_non_comments, get_top_functions
+from utils.vector_store import get_vector_store
 import os
 
 # Initialize the C language
@@ -167,7 +167,7 @@ def main():
 
     get_vector_store(
         list_of_captured_functions + list_of_captured_structs + list_of_captured_enums,
-        index_name="vector_db_index/coreutils_index_functions",
+        index_name="vector_db_index/coreutils_index_functions_structs_enums",
     )
 
 if __name__ == "__main__":

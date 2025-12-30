@@ -230,7 +230,6 @@ def initialize_graph():
 
     # Compile
     temp =  workflow.compile(checkpointer=memory)
-    print(temp.get_graph().draw_mermaid())
     return temp
 
 app = initialize_graph()
