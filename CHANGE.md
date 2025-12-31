@@ -16,7 +16,7 @@ All notable changes to the **GNU Coreutils AI Navigator** project will be docume
 ### [0.4]
 #### Problems
 - The agent was answering unrelated queries (e.g., cooking recipes) leading to wasted compute and poor user experience.
-- There was a minor bug in the implementation of `Finalize` node causing it to not return the final answer properly.
+- There was a minor bug in the implementation of `finalize` node causing it to not return the final answer properly.
 
 #### Added
 - Did some prompt engineering to make the agent reject unrelated queries before execution by modifying the system prompt.
@@ -36,9 +36,9 @@ I discovered state variables cannot be updated this way because I used a reducer
 - While using the LLM model `qwen-7b`, the model was involving in too many reasoning steps, leading to high latency and cost.
 
 #### Added
-- Implemented **Short Term Memory** where a list of recent interactions is stored and prepended to each new user query to provide immediate context.
-- Added **loop_step** variable to agent state to keep track of the number of reasoning steps taken by the agent. If the number exceeds a predefined threshold (e.g., 5), the agent will terminate further reasoning, move to `Finalize` node and provide the best possible answer based on the information gathered so far.
-- Impleted UI using Streamlit.
+- Implemented **Long Term Memory** where a list of recent interactions is stored and prepended to each new user query to provide immediate context.
+- Added **loop_step** variable to agent state to keep track of the number of reasoning steps taken by the agent. If the number exceeds a predefined threshold (e.g., 5), the agent will terminate further reasoning, move to `finalize` node and provide the best possible answer based on the information gathered so far.
+- Implemented UI using Streamlit.
 
 
 ### [0.2]
@@ -52,6 +52,7 @@ I discovered state variables cannot be updated this way because I used a reducer
     - Added `search_concepts` tool to search in comments vectorstore and readme vectorstore.
     - Added `search_implementations` tool to search in functions/structs/enums vectorstore.
     - Added `agent` node to reason and call the above tools.
+    - Added `tools` node to execute the retrieval functions.
 
 
 ### [0.1]

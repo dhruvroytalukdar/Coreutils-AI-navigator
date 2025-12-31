@@ -14,13 +14,13 @@ The **Coreutils AI Navigator** is an agentic AI application. It leverages a **Re
 ## 🚀 Key Features
 
 * **LLM used:** OpenAI GPT-OSS-20B (finetuned for code reasoning tasks).
+* **Embedding model:** Hugging Face SentenceTransformer model (all-mpnet-base-v2).
 * **Codebase:** GNU Coreutils C source code (over 500,000 lines of code).
 * **Orchestration framework:** Langgraph and Langchain.
 * **Monitoring:** Integrated with LangSmith for trace analysis, latency monitoring, and cost tracking.
 * **Production Guardrails:**
     * **Topic Filtering:** Rejects unrelated queries (e.g., cooking recipes) before execution.
     * **Loop Protection:** Hard limits on reasoning steps to prevent infinite loops and cost overruns.
-    * **Context Trimming:** Smart token management to handle large C files within context windows.
 * **Resilient UI:** Streamlit interface with persistent thread memory and real-time thought process visualization.
 * **Vector Database:** FAISS for efficient retrieval of relevant code snippets.
 * **Providers:** Embedding models from Hugging Face & LLMs from Groq.
