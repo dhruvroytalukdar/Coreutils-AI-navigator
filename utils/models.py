@@ -15,6 +15,33 @@ class Captured_Comment:
             "file_name": self.file_name
         }
 
+
+class Captured_Procedure:
+    def __init__(self, file_name: str, body: str) -> None:
+        self.file_name = file_name
+        self.body = body
+    
+    def get_content(self) -> str:
+        return self.body
+
+    def get_metadata(self) -> dict:
+        return {
+            "file_name":self.file_name
+        }
+
+class Captured_Paragraph:
+    def __init__(self, file_name: str, body: list[str]) -> None:
+        self.file_name = file_name
+        self.body = '\n'.join(body)
+    
+    def get_content(self) -> str:
+        return self.body
+
+    def get_metadata(self) -> dict:
+        return {
+            "file_name":self.file_name
+        }
+    
 class Captured_Function:
     def __init__(self, name: str, body: str, called_functions: list, file_name: str, comment: str = None) -> None:
         self.function_name = name

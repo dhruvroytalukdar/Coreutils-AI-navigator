@@ -2,6 +2,26 @@
 
 All notable changes to the **GNU Coreutils AI Navigator** project will be documented in this file.
 
+### [0.9]
+- Broken down `search_concepts` logic into two parts `search_cobol_logic` and `search_cobol_data`
+
+### [0.8]
+Used ANTLR parser in Java to parse COBOL code.
+#### Problems
+- The current parser is not able to parse copybooks and some files which are running code from a BMS file. (Possible Assembly)
+#### Fix
+- So for now skipping those file.
+
+- Storing only the code segments in the vector database is not working properly because the user query will be in natural language and similarity search will not be able to match natural language with code.
+#### Fix
+- Using Ollama to generate summary for the code segment locally and then storing the contents in vector database.
+
+### [0.7]
+Tried to implement a parser for COBOL language in tree-sitter and tested over the cics-genapp repository.
+#### Problems
+- Tree-sitter is not able to parse non-COBOL commands like EXEC CICS/SQL
+
+
 ### [0.6]
 #### Added
 - Updated the README.md to reflect the latest features and architecture of the project.

@@ -11,27 +11,29 @@ from langgraph.prebuilt import ToolNode
 from langgraph.checkpoint.memory import InMemorySaver
 import streamlit as st
 from dotenv import load_dotenv
-from utils.tools import search_concepts, search_implementations
+from utils.tools import search_concepts, search_cobol_logic, search_cobol_data
 
 load_dotenv()
 
 # Initialize Streamlit
 st.set_page_config(page_title="GNU Coreutils AI Navigator", page_icon="🐧")
 st.markdown("""
-    # 🐧 GNU Coreutils AI Navigator
+    # 🐧 CICS-Genapp AI Navigator
     
-    **Your expert co-pilot for exploring the source code of standard Linux utilities (`ls`, `cp`, `mv`, etc.).**
-    
+    **Your expert co-pilot for navigating and understanding the CICS-Genapp COBOL application source code.**   
+    *CICS-Genapp is a working general insurance sample application, written in COBOL and designed to demonstrate and exercise features of IBM CICS Transaction Server (TS).*
     
     ### 🚀 Key Features
-    * **🔍 Conceptual Search:** Can answer detailed answer about library functions.
-    * **⚙️ Short Term Memory:** The agent remembers recent interactions to provide contextually relevant answers.
-    * **🛠️ Tool Integration:** Leverages specialized tools to fetch code snippets and definitions from the GNU Coreutils codebase.
-    * **🤖 ReAct Agent Architecture:** Combines reasoning and tool usage for efficient problem-solving.
+    * **🔍 Code Semantics Search:** Can answer detailed questions about COBOL programs and CICS interactions within the GenApp codebase.
+    * **⚙️ Short Term Memory:** The agent maintains recent context so explanations remain coherent across follow-ups.
+    * **🛠️ Tool Integration:** Uses RAG retrieval to fetch relevant COBOL code segments, copybook definitions, and CICS control logic from the repository.
+    * **🤖 ReAct + CICS-Aware Architecture:** Combines reasoning with targeted tool calls (e.g., program lookup, paragraph extraction, CICS transaction flow tracing) for precise analysis.
             
     ### 💡 Try Asking...
-    * *"How does the `cp` command handle symbolic links?"*
-    * *"Find the struct definition for `fileinfo` in ls.c"*
+    * *"How does the `LGTESTP1` program handle the Customer Inquiry transaction?"*
+    * *"What happens when a duplicate customer is detected?"*
+    * *"What is the layout of the Customer Record?"*
+    * *"Compare the error handling in lgacdb01 vs lgicus01."*
 """)
 
 if "messages" not in st.session_state:
@@ -66,7 +68,7 @@ def navigation_router(state: AgentState):
 
     current_step = state.get("loop_step", 0)
     print("Current Step:", current_step)
-    if current_step >= 5:
+    if current_step >= 8:
         return "finalizer"
     
     last_message = state["messages"][-1]
@@ -94,6 +96,15 @@ def sanitize(messages):
             cleaned.append(m)
     return cleaned
 
+# USE PYDANTIC FOR OUTPUT PARSING
+# TREE SITTER
+# LANGGRAPH & LANGCHAIN
+# Learn COBOL, cobc
+# use tree sitter to parse cobol code
+# cics-genapp
+# https://github.com/cicsdev/cics-genapp/tree/main
+# redefine in cobol
+# tree sitter cobol
 
 # ==============================================================================
 # BUILD THE GRAPH
@@ -107,7 +118,7 @@ def initialize_graph():
     """
 
     # List of tools for the Agent
-    tools = [search_concepts, search_implementations]
+    tools = [search_concepts, search_cobol_data, search_cobol_logic]
     # Initialize LLM and bind tools
     llm = ChatGroq(model="openai/gpt-oss-20b", temperature=0.3)
     llm_with_tools = llm.bind_tools(tools)
@@ -122,12 +133,12 @@ def initialize_graph():
         print("Inside Agent Node")
 
         system_msg = textwrap.dedent("""
-            You are an expert C/C++ technical assistant analyzing the GNU Coreutils library **ONLY**.
+            You are an expert COBOL technical assistant analyzing the CICS-Genapp COBOL library **ONLY**.
             To understand high-level behavior, search for documentation and developer comments, use 'search_concepts'.
-            To search for C code, structs, enums or function use 'search_implementations'.
-            If the user asks about ANY topic unrelated to Coreutils, C programming, or Linux system calls, you must:
+            To search for COBOL code, procedures, sections use 'search_implementations'.
+            If the user asks about ANY topic unrelated to CICS-Genapp, COBOL programming you must:
             1. REFUSE to answer.
-            2. State clearly: 'I can only assist with GNU Coreutils and related system programming topics.'
+            2. State clearly: 'I can only assist with CICS-Genapp and related system programming topics.'
             3. DO NOT try to be helpful or provide a 'brief' answer to the off-topic query.
             If you are **UNSURE** or **UNABLE TO ANSWER**, output the final answer **immediately** or specify 'I cannot help you with this query'.
             The user may ask wrong or misleading questions. Always provide the correct information.
@@ -136,13 +147,14 @@ def initialize_graph():
             Always cite the file name when explaining logic.
         """).strip()
 
+
         # System prompt to ground the agent's behavior
         system_msg = SystemMessage(content=system_msg)
 
         trimmed_messages = trim_messages(state["messages"],
                                         strategy="last",
                                         token_counter=count_tokens_approximately,
-                                        max_tokens=10000,
+                                        max_tokens=20000,
                                         start_on="human",
                                         end_on=("human", "tool"),)
 

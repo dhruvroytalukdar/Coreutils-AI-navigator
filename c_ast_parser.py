@@ -1,7 +1,7 @@
 from tree_sitter import Language, Parser, Query, QueryCursor
 import tree_sitter_c as tsc
 from utils.models import Captured_Struct, Captured_Enum, Captured_Function, Captured_Comment
-from utils.query_schema import query_schema
+from utils.query_schema_c import query_schema
 from utils.vector_store import get_vector_store
 import os
 

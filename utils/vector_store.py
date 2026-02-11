@@ -10,7 +10,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter, Language
 # We use the open-source 'all-MiniLM-L6-v2' model via Hugging Face
 embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 
-def get_vector_store(captured_items: list = [], index_name: str  = None, load_from_disk: bool = False) -> FAISS:
+def get_vector_store(captured_items: list = [], index_name: str = None, load_from_disk: bool = False) -> FAISS:
 
     if load_from_disk:
         print("Loading index from disk...")

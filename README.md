@@ -134,3 +134,38 @@ Create a `.env` file in the root directory and paste the contents.
 ```bash
 streamlit run reAct_agent.py
 ```
+
+
+## AI Prompts I used to develop the project
+
+### Prompts for ANTLR parser setup and Java code extractor
+
+* I am trying to use proleap cobol parser to parse cobol files in cics-genapp. provide me some starter code to parse cobol code.
+* I am trying to parse the above .cbl file using the above setup but i am getting the below error
+"Is FIXED the correct line format (Columns 1-6 sequence number, column 7 indicator area, columns 8-72 for areas A and B)? Could not parse line 58: ENT1HNM DFHMDF POS=(08,50),LENGTH=20,ATTRB=(NORM,UNPROT,FSET),         X". The thing is i am skipping the copybooks entirely and the above statement is not even present in the file still i am getting this message.
+* Still I am getting this error "io.proleap.cobol.preprocessor.exception.CobolPreprocessorException: Could not find copy book SSMAP in directory of COBOL input file or copy books param object." Explain the error.
+* How to run the Java File having my parser? Note I am not using Eclipse.
+* Now I want to parse the cobol files, extract important code segments and store them in vector database. later on i want to extract important code segments based on user query using langchain and langgraph in python. So tell me how i can extract cobol code segments and build the vectorbase. Can I use the python environment entirely for handling the vector database and somehow pass the data to it using Java.
+* Say i want to learn in details about the apis or antlr library for cobol. suggest me articles which I can read to learn more about it.
+* why did we make the CodeSegment class static? Explain in simple terms and in short.
+* Explain in details what is happening in the below line segments. Explain all alternative arguments which can be useful in other scenarios with full explanations.
+* Tell me what is happening in the below code
+`ProcedureDivision pd = program.getCompilationUnits().get(0).getProgramUnit().getProcedureDivision();`
+* I wrote a java code to scan all cobol files in a directory extract paragraph and store that in a json file. I am using multiple threads and i think the global "segments" list needed to be protected by locks. Tell me how to protect the list from data race in Java.
+* can you tell me why the above paragraph is parsed as the below text in the code that you suggested. And why does it contain symbols like \u0027, and there is `END-EXEC }` suddenly although there is no `}` in the code, words in a sentence do not have spaces in between how to introduce spaces? 
+
+`MOVE\u0027 DELETE POLICY  \u0027TOEM-SQLREQ\n*\u003eEXECSQL EXEC SQL\r*\u003eEXECSQL DELETE\r*\u003eEXECSQL FROM POLICY\r*\u003eEXECSQL WHERE ( CUSTOMERNUMBER \u003d :DB2-CUSTOMERNUM-INT AND\r*\u003eEXECSQL POLICYNUMBER  \u003d :DB2-POLICYNUM-INT      )\r*\u003eEXECSQL END-EXEC }\nIFSQLCODENOTEQUAL0ThenMOVE\u002790\u0027TOCA-RETURN-CODEPERFORMWRITE-ERROR-MESSAGE*\u003eEXECCICS EXEC CICS RETURN END-EXEC }END-IF\nEXIT\n`
+* Why is there a end curly brace after `END-EXEC }\r\n`?
+* Another thing i was thinking about instead of storing the cobol code as a whole in the vector database what if we store human readable text summary of what the code does into the vector databased which i can generate from some LLM by sending the code segment. The retrieval can then work on the summary text which will be easier to match with user query which will be in natural language as well. We can store the code segment as metadata and inject it into the prompt of the actual algorithm after retrieval using the natural language summary. For now I can use local llm tools like ollama to generate the summary.
+* What exactly is stored in the linkage section in COBOL and is it relevant to store its contents in vector database?
+* How to extract grouped data records in COBOL?
+
+
+### Prompts for changes in the AI agent code in python
+* Write me a better prompt for generating summary of COBOL code segments which will be good for vector search task as well.
+* how to retrieve content from ollama strictly in json formatting, enforcing strict formatting like using pydantic or typing in python.
+* will it be a good idea to insert JSON in the vector database? Isn't the primary reason we are storing summary as plain natural text is to facilitate vector similarity search using natural language as user query is also natural language.
+* Provide some good resouces on pydantic and should I know if I am starting from zero.
+* Give me some sample queries on the cics genapp repository to test my chatbot. The queries should test the agents understanding of the COBOL code and its ability to answer relevantly.
+* Generate informative doc string for my below pydantic class.
+

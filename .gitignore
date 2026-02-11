@@ -11,3 +11,6 @@ wheels/
 .env
 coreutils
 coreutils-master
+imgs
+cics-genapp-master
+cics-genapp
